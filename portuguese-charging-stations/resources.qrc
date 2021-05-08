@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/plugins/portuguese_charging_station" >
+        <file>icon.png</file>
+        <file>raio.png</file>
+    </qresource>
+</RCC>
