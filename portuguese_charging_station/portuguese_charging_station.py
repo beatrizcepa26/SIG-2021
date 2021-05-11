@@ -29,19 +29,18 @@ import json
 import requests
 from re import *
 import pandas as pd
-import xmltodict
 import os
 from qgis.core import *
 from pandas import json_normalize
 import csv
+from requests.exceptions import HTTPError
 from requests.packages import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-# Initialize Qt resources from file resources.py
 from .resources import *
-# Import the code for the dialog
 from .portuguese_charging_station_dialog import PortugueseChargingStationDialog
 import os.path
 
+caminho = 'C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/'
 
 class PortugueseChargingStation:
     """QGIS Plugin Implementation."""
@@ -77,6 +76,7 @@ class PortugueseChargingStation:
         # Check if plugin was started the first time in current QGIS session
         # Must be set in initGui() to survive plugin reloads
         self.first_start = None
+
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -191,66 +191,44 @@ class PortugueseChargingStation:
             self.iface.removeToolBarIcon(action)
 
 
-    def make_request_overpass(self):
+    def make_request(self, url):
 
-        # Ir buscar os dados dos postos elétricos à API do Overpass
-        response = requests.get('https://lz4.overpass-api.de/api/interpreter?data=%3Cosm-script output%3D%22json%22 timeout%3D%2225%22%3E%0A    %3Cid-query ref%3D%223600295480%22 type%3D%22area%22 into%3D%22area_0%22/%3E%0A    %3Cunion%3E%0A        %3Cquery type%3D%22node%22%3E%0A            %3Chas-kv k%3D%22amenity%22 v%3D%22charging_station%22/%3E%0A            %3Carea-query from%3D%22area_0%22/%3E%0A        %3C/query%3E%0A        %3Cquery type%3D%22way%22%3E%0A            %3Chas-kv k%3D%22amenity%22 v%3D%22charging_station%22/%3E%0A            %3Carea-query from%3D%22area_0%22/%3E%0A        %3C/query%3E%0A        %3Cquery type%3D%22relation%22%3E%0A            %3Chas-kv k%3D%22amenity%22 v%3D%22charging_station%22/%3E%0A            %3Carea-query from%3D%22area_0%22/%3E%0A        %3C/query%3E%0A    %3C/union%3E%0A    %3Cunion%3E%0A        %3Citem/%3E%0A        %3Crecurse type%3D%22down%22/%3E%0A    %3C/union%3E%0A    %3Cprint mode%3D%22body%22/%3E%0A%3C/osm-script%3E&info=QgisQuickOSMPlugin',verify=False)
+        try:
+            # Ir buscar os dados dos postos elétricos
+            response = requests.get(url,verify=False)
 
-        # Converter o xml recebido num dicionário
-        #dict_data = xmltodict.parse(response.content)
-        dict_data = json.loads(response.content)
-        
-        # Converter o dicionário para Json
-        json_data = json.dumps(dict_data)
+            json_data = response.json()
+            
+            return json_data
 
-        # Escrever o Json num ficheiro
-        with open("C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/osm_data.json", "w") as json_file:
-            json_file.write(json_data)
-
-
-    def make_request_mobie(self):
-
-        # Ir buscar os dados dos postos elétricos à Mobi.E
-        response = requests.get('https://ocpi.mobinteli.com/2.2/locations')
-
-        # Converter o conteúdo recebido num dicionário
-        dict_data = json.loads(response.content)
-
-        # Separar a latitude e a longitude
-        for el in dict_data:
-            latitude = el['coordinates']['latitude']
-            longitude = el['coordinates']['longitude']
-            el['latitude'] = latitude
-            el['longitude'] = longitude
-        
-        # Converter o dicionário para Json
-        json_data = json.dumps(dict_data)
-
-        # Escrever o Json num ficheiro
-        with open("C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/mobie_data.json", "w") as json_file:
-            json_file.write(json_data)
+        except HTTPError as http_error:
+            print(f'HTTP error occurred: {http_error}')
     
 
-    def make_request_mobie_tarifas(self):
+    def make_request_mobie_tarifas(self, url, csv_file):
 
-        # Ir buscar os dados das tarifas pagas nos postos da Mobi.E
-        response = requests.get('https://www.mobie.pt/documents/42032/106470/Tarifas',verify=False)
+        try:
+            # Ir buscar os dados das tarifas pagas nos postos da Mobi.E
+            response = requests.get(url,verify=False)
 
-        content = response.content.decode('utf-8')
+            content = response.content.decode('utf-8')
 
+        except HTTPError as http_error:
+            print(f'HTTP error occurred: {http_error}')
+            
         cr = csv.reader(content.splitlines(), delimiter=';')
         my_list = list(cr)
         
         # Escrever o conteúdo num csv e guardá-lo
-        with open('C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/tarifas.csv', 'w', newline='') as file:
+        with open(caminho+csv_file, 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerows(my_list)
         
 
     def merge_csvs(self,mobie_data,tarifas_data):
 
-        mobie = pd.read_csv(mobie_data)
-        tarifas = pd.read_csv(tarifas_data)
+        mobie = pd.read_csv(caminho+mobie_data)
+        tarifas = pd.read_csv(caminho+tarifas_data)
 
         tarifas.rename(columns={tarifas.columns[0]:'id','Value':'Value (€)'},inplace=True)
 
@@ -263,16 +241,17 @@ class PortugueseChargingStation:
         del output['Unnamed: 0']
 
         # Escrever o resultados num csv
-        output.to_csv('C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/mobie_data_processado.csv')
+        output.to_csv(caminho+'mobie_data_processado.csv')
 
 
     # Remover lixo e organizar a informação oriunda da Mobi.E
-    def processa(self,json_file):
+    def processa(self,json_data):
 
-        with open('C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/'+json_file) as f:
-            data = json.load(f)
-
-        for posto in data:
+        for posto in json_data:
+            latitude = posto['coordinates']['latitude']
+            longitude = posto['coordinates']['longitude']
+            posto['latitude'] = latitude
+            posto['longitude'] = longitude
             del posto['coordinates']
             info = posto['evses']
             posto['evse'] = []
@@ -292,49 +271,33 @@ class PortugueseChargingStation:
                     'max_amperage':tomada['connectors'][0]['max_amperage'],
                     'max_electric_power':tomada['connectors'][0]['max_electric_power']}
                 del tomada['connectors']
-
             del posto['evses']
 
-        json_data = json.dumps(data)
-
-        # Escrever o Json processado num ficheiro
-        with open("C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/mobie_data_processado.json", "w") as json_file:
-            json_file.write(json_data)
+        return json_data
 
 
     # Remover lixo e extrair apenas a informação dos postos oriunda da Overpass API
-    def extrai_postos(self,json_file):
-
-        with open('C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/'+json_file) as f:
-            data = json.load(f)
+    def extrai_postos(self,json_data):
 
         # Ignorar metadados e informação de cabeçalho
-        content = data['elements']
+        content = json_data['elements']
 
         # Limpar os dados e estruturar de forma organizada
         for posto in content:
             info = posto['tags']
-            print(info)
             for key in list(info.keys()):
                 posto[key] = info[key]
             del posto['tags']
-
-        json_data = json.dumps(content)
         
-        # Escrever o Json processado num ficheiro
-        with open("C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/osm_data_processado.json", "w") as json_file:
-            json_file.write(json_data)
+        return content
 
 
     # converter o json para csv
-    def convert_json_to_csv(self,json_file,csv_file):
+    def convert_json_to_csv(self, json_data, csv_file):
 
-        with open("C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/"+json_file) as f:
-            data = json.load(f)
-            # é necessária normalização
-            df = json_normalize(data)
+        df = json_normalize(json_data)
 
-        df.to_csv(f'C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/{csv_file}')
+        df.to_csv(caminho+csv_file)
 
 
     # adicionar camada a partir dos dados do csv, no caso dos dados provenientes da Overpass API
@@ -347,7 +310,7 @@ class PortugueseChargingStation:
         categories = []
         # get unique values
         unique_values = ['yes','no','']
-        label = {'yes':'cobra taxa','no':'não cobra taxa','':'desconhecido'}
+        label = {'yes':'Cobra taxa','no':'Não cobra taxa','':'Desconhecido'}
         for unique_value in unique_values:
             # initialize the default symbol for this geometry type
             symbol = QgsSymbol.defaultSymbol(vlayer.geometryType())
@@ -411,7 +374,7 @@ class PortugueseChargingStation:
         
 
     def add_open_street_map(self):
-        # Caso o utilizador não tenha definido nenhuma camada no seu projeto, é adicionada uma camada com um mapa mundo do OpenStreetMap.
+        # Caso o utilizador não tenha definida nenhuma camada no seu projeto, é adicionada uma camada com um mapa mundo do OpenStreetMap.
         
         sources = [layer.source() for layer in QgsProject.instance().mapLayers().values()]
         source_found = False
@@ -454,31 +417,36 @@ class PortugueseChargingStation:
         if result:
             text = self.dlg.comboBox.currentText()
             if text == 'Rede Mobi.E':
+                
                 self.add_open_street_map()
 
-                self.make_request_mobie()
-                self.make_request_mobie_tarifas()
-
-                self.processa('mobie_data.json')
-
-                self.convert_json_to_csv('mobie_data_processado.json','mobie_data.csv')
-
-                self.merge_csvs('C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/mobie_data.csv','C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/tarifas.csv')
+                mobie_data = self.make_request('https://ocpi.mobinteli.com/2.2/locations')
                 
-                uri = "file:///C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/mobie_data_processado.csv?encoding=%s&delimiter=%s&xField=%s&yField=%s&crs=%s" % ("UTF-8",",", "longitude", "latitude","epsg:4326")
+                self.make_request_mobie_tarifas('https://www.mobie.pt/documents/42032/106470/Tarifas','tarifas.csv')
+
+                json_data = self.processa(mobie_data)
+
+                self.convert_json_to_csv(json_data,'mobie_data.csv')
+
+                self.merge_csvs('mobie_data.csv','tarifas.csv')
+                
+                uri = "file:///"+caminho+'mobie_data_processado.csv?encoding=%s&delimiter=%s&xField=%s&yField=%s&crs=%s' % ("UTF-8",",", "longitude", "latitude","epsg:4326")
                 
                 self.add_layer_mobie(uri)
 
             elif text == 'Overpass API':
 
+                url = 'https://lz4.overpass-api.de/api/interpreter?data=%3Cosm-script output%3D%22json%22 timeout%3D%2225%22%3E%0A    %3Cid-query ref%3D%223600295480%22 type%3D%22area%22 into%3D%22area_0%22/%3E%0A    %3Cunion%3E%0A        %3Cquery type%3D%22node%22%3E%0A            %3Chas-kv k%3D%22amenity%22 v%3D%22charging_station%22/%3E%0A            %3Carea-query from%3D%22area_0%22/%3E%0A        %3C/query%3E%0A        %3Cquery type%3D%22way%22%3E%0A            %3Chas-kv k%3D%22amenity%22 v%3D%22charging_station%22/%3E%0A            %3Carea-query from%3D%22area_0%22/%3E%0A        %3C/query%3E%0A        %3Cquery type%3D%22relation%22%3E%0A            %3Chas-kv k%3D%22amenity%22 v%3D%22charging_station%22/%3E%0A            %3Carea-query from%3D%22area_0%22/%3E%0A        %3C/query%3E%0A    %3C/union%3E%0A    %3Cunion%3E%0A        %3Citem/%3E%0A        %3Crecurse type%3D%22down%22/%3E%0A    %3C/union%3E%0A    %3Cprint mode%3D%22body%22/%3E%0A%3C/osm-script%3E&info=QgisQuickOSMPlugin'
+
                 self.add_open_street_map()
 
-                self.make_request_overpass()
+                osm_data = self.make_request(url)
                 
-                self.extrai_postos('osm_data.json')
+                json_data = self.extrai_postos(osm_data)
 
-                self.convert_json_to_csv('osm_data_processado.json','osm_data.csv')
-                uri = "file:///C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/osm_data.csv?encoding=%s&delimiter=%s&xField=%s&yField=%s&crs=%s" % ("UTF-8",",", "lon", "lat","epsg:4326")
+                self.convert_json_to_csv(json_data,'osm_data.csv')
+               
+                uri = "file:///"+caminho+'osm_data.csv?encoding=%s&delimiter=%s&xField=%s&yField=%s&crs=%s' % ("UTF-8",",", "lon", "lat","epsg:4326")
                 
                 self.add_layer_osm(uri)
 
@@ -486,24 +454,27 @@ class PortugueseChargingStation:
 
                 self.add_open_street_map()
 
-                self.make_request_mobie()
-                self.make_request_mobie_tarifas()
-                self.make_request_overpass()
-
-                self.processa('mobie_data.json')
-
-                self.convert_json_to_csv('mobie_data_processado.json','mobie_data.csv')
-
-                self.merge_csvs('C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/mobie_data.csv','C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/tarifas.csv')
+                mobie_data = self.make_request('https://ocpi.mobinteli.com/2.2/locations')
                 
-                uri = "file:///C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/mobie_data_processado.csv?encoding=%s&delimiter=%s&xField=%s&yField=%s&crs=%s" % ("UTF-8",",", "longitude", "latitude","epsg:4326")
+                self.make_request_mobie_tarifas('https://www.mobie.pt/documents/42032/106470/Tarifas','tarifas.csv')
+                
+                osm_data = self.make_request('https://lz4.overpass-api.de/api/interpreter?data=%3Cosm-script output%3D%22json%22 timeout%3D%2225%22%3E%0A    %3Cid-query ref%3D%223600295480%22 type%3D%22area%22 into%3D%22area_0%22/%3E%0A    %3Cunion%3E%0A        %3Cquery type%3D%22node%22%3E%0A            %3Chas-kv k%3D%22amenity%22 v%3D%22charging_station%22/%3E%0A            %3Carea-query from%3D%22area_0%22/%3E%0A        %3C/query%3E%0A        %3Cquery type%3D%22way%22%3E%0A            %3Chas-kv k%3D%22amenity%22 v%3D%22charging_station%22/%3E%0A            %3Carea-query from%3D%22area_0%22/%3E%0A        %3C/query%3E%0A        %3Cquery type%3D%22relation%22%3E%0A            %3Chas-kv k%3D%22amenity%22 v%3D%22charging_station%22/%3E%0A            %3Carea-query from%3D%22area_0%22/%3E%0A        %3C/query%3E%0A    %3C/union%3E%0A    %3Cunion%3E%0A        %3Citem/%3E%0A        %3Crecurse type%3D%22down%22/%3E%0A    %3C/union%3E%0A    %3Cprint mode%3D%22body%22/%3E%0A%3C/osm-script%3E&info=QgisQuickOSMPlugin')
+
+                json_data = self.processa(mobie_data)
+
+                self.convert_json_to_csv(json_data,'mobie_data.csv')
+
+                self.merge_csvs('mobie_data.csv','tarifas.csv')
+                
+                uri = "file:///"+caminho+"mobie_data_processado.csv?encoding=%s&delimiter=%s&xField=%s&yField=%s&crs=%s" % ("UTF-8",",", "longitude", "latitude","epsg:4326")
                 
                 self.add_layer_mobie(uri)
 
-                self.extrai_postos('osm_data.json')
+                json_data = self.extrai_postos(osm_data)
 
-                self.convert_json_to_csv('osm_data_processado.json','osm_data.csv')
-                uri = "file:///C:/Users/user/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/portuguese_charging_station/data/osm_data.csv?encoding=%s&delimiter=%s&xField=%s&yField=%s&crs=%s" % ("UTF-8",",", "lon", "lat","epsg:4326")
+                self.convert_json_to_csv(json_data,'osm_data.csv')
+                
+                uri = "file:///"+caminho+"osm_data.csv?encoding=%s&delimiter=%s&xField=%s&yField=%s&crs=%s" % ("UTF-8",",", "lon", "lat","epsg:4326")
                 
                 self.add_layer_osm(uri)
 
