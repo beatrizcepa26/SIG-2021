@@ -194,9 +194,10 @@ class PortugueseChargingStation:
     def make_request(self, url):
 
         try:
-            # Ir buscar os dados dos postos elétricos
+            # get electrical stations' data from the URL
             response = requests.get(url,verify=False)
 
+            # convert the result to json
             json_data = response.json()
             
             return json_data
@@ -208,18 +209,20 @@ class PortugueseChargingStation:
     def make_request_mobie_tarifas(self, url, csv_file):
 
         try:
-            # Ir buscar os dados das tarifas pagas nos postos da Mobi.E
+            # get the fees' data from the Mobi.E charging stations
             response = requests.get(url,verify=False)
-
+            
+            # get only the content of the response
             content = response.content.decode('utf-8')
 
+        # if the file is not returned, raise an error
         except HTTPError as http_error:
-            print(f'HTTP error occurred: {http_error}')
+            print(f'HTTP error occurred: {http_error}')                     
             
         cr = csv.reader(content.splitlines(), delimiter=';')
         my_list = list(cr)
         
-        # Escrever o conteúdo num csv e guardá-lo
+        # write the content in a csv file and save it
         with open(caminho+csv_file, 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerows(my_list)
@@ -235,16 +238,16 @@ class PortugueseChargingStation:
         del tarifas['MinLevelValue']
         del tarifas['MaxLevelValue']
 
-        # Juntar a informação dos postos da Mobi.E com a informação das tarifas pagas nesses postos
+        # merge the information about the charging stations and their corresponding Mobi.E fees
         output = pd.merge(mobie, tarifas, on='id', how='inner')
 
         del output['Unnamed: 0']
 
-        # Escrever o resultados num csv
+        # write the final resultas in a csv file
         output.to_csv(caminho+'mobie_data_processado.csv')
 
 
-    # Remover lixo e organizar a informação oriunda da Mobi.E
+    # Organize the Mobi.E information and remove unnecessary fields
     def processa(self,json_data):
 
         for posto in json_data:
@@ -276,13 +279,13 @@ class PortugueseChargingStation:
         return json_data
 
 
-    # Remover lixo e extrair apenas a informação dos postos oriunda da Overpass API
+    # remove unecessary information and extract only the charging stations from the Overpass API
     def extrai_postos(self,json_data):
 
-        # Ignorar metadados e informação de cabeçalho
+        # ignore metadata and header information
         content = json_data['elements']
 
-        # Limpar os dados e estruturar de forma organizada
+        # clean and structure the data
         for posto in content:
             info = posto['tags']
             for key in list(info.keys()):
@@ -292,7 +295,7 @@ class PortugueseChargingStation:
         return content
 
 
-    # converter o json para csv
+    # convert json to csv
     def convert_json_to_csv(self, json_data, csv_file):
 
         df = json_normalize(json_data)
@@ -300,7 +303,7 @@ class PortugueseChargingStation:
         df.to_csv(caminho+csv_file)
 
 
-    # adicionar camada a partir dos dados do csv, no caso dos dados provenientes da Overpass API
+    # add layer from the csv data (from the Overpass API)
     def add_layer_osm(self,uri):
     
         vlayer = QgsVectorLayer(uri, "postos_carregamento_overpass", "delimitedtext")
@@ -341,7 +344,7 @@ class PortugueseChargingStation:
         vlayer.setRenderer(renderer)
 
 
-    # adicionar camada a partir dos dados do csv, no caso dos dados provenientes da Mobi.E
+    # add layer from the csv data (from the Mobi.E network)
     def add_layer_mobie(self,uri):
     
         vlayer = QgsVectorLayer(uri, "postos_carregamento_mobie", "delimitedtext")
@@ -374,7 +377,7 @@ class PortugueseChargingStation:
         
 
     def add_open_street_map(self):
-        # Caso o utilizador não tenha definida nenhuma camada no seu projeto, é adicionada uma camada com um mapa mundo do OpenStreetMap.
+        # If the user doesn't have a layer defined in his project, a layer is added with a world map from OpenStreetMap
         
         sources = [layer.source() for layer in QgsProject.instance().mapLayers().values()]
         source_found = False
