@@ -5,3 +5,8 @@ Neste repositório está incluído um plugin para o QGIS - PortugueseChargingSta
 --
 
 This repository includes a QGIS plugin - PortugueseChargingStations - developed to display the location of Portuguese electrical charging stations. To do this, two data sources were used: Mobi.E network and Ovarpass API. The file portuguese_charging_station.py contains the Python code developed for the plugin.
+
+--
+Grupo 6:
+Beatriz Cepa a83813
+Beatriz Soares a85815
