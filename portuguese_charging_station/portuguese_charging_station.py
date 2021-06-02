@@ -319,11 +319,11 @@ class PortugueseChargingStation:
             symbol = QgsSymbol.defaultSymbol(vlayer.geometryType())
             
             if unique_value == 'yes':
-                path = "https://raw.githubusercontent.com/beatrizcepa26/SIG-2021/c967ceeab60e3efb852b5be1988f2e2d630ffa04/portuguese-charging-stations/carro-eletrico.svg"
+                path = "https://raw.githubusercontent.com/beatrizcepa26/SIG-2021/2296cc921ab8fd9b1a23bfb8b3fd5c84f6a0fa20/portuguese_charging_station/icons/carro-eletrico.svg"
             elif unique_value == 'no':
-                path = "https://raw.githubusercontent.com/beatrizcepa26/SIG-2021/c5e2f07aaa199188148f7dfc0663bcca0b7a6a30/portuguese-charging-stations/carro-eletrico2.svg"
+                path = "https://raw.githubusercontent.com/beatrizcepa26/SIG-2021/2296cc921ab8fd9b1a23bfb8b3fd5c84f6a0fa20/portuguese_charging_station/icons/carro-eletrico2.svg"
             else:
-                path = "https://raw.githubusercontent.com/beatrizcepa26/SIG-2021/c5e2f07aaa199188148f7dfc0663bcca0b7a6a30/portuguese-charging-stations/carro-eletrico3.svg"
+                path = "https://raw.githubusercontent.com/beatrizcepa26/SIG-2021/2296cc921ab8fd9b1a23bfb8b3fd5c84f6a0fa20/portuguese_charging_station/icons/carro-eletrico3.svg"
                 
             new_symbol = QgsSvgMarkerSymbolLayer(path)
             new_symbol.setSize(6)
@@ -354,7 +354,8 @@ class PortugueseChargingStation:
         symbol = QgsSymbol.defaultSymbol(vlayer.geometryType())
         renderer = QgsRuleBasedRenderer(symbol)
 
-        info = [("Cobra taxa",' \"Value (€)\" > (0) ',"https://raw.githubusercontent.com/beatrizcepa26/SIG-2021/c5e2f07aaa199188148f7dfc0663bcca0b7a6a30/portuguese-charging-stations/carro-eletrico_1.svg"),("Não cobra taxa",' \"Value (€)\" = (0) ',"https://raw.githubusercontent.com/beatrizcepa26/SIG-2021/c5e2f07aaa199188148f7dfc0663bcca0b7a6a30/portuguese-charging-stations/carro-eletrico_2.svg")]
+        info = [("Cobra taxa",' \"Value (€)\" > (0) ',"https://raw.githubusercontent.com/beatrizcepa26/SIG-2021/2296cc921ab8fd9b1a23bfb8b3fd5c84f6a0fa20/portuguese_charging_station/icons/carro-eletrico_1.svg"),
+        ("Não cobra taxa",' \"Value (€)\" = (0) ',"https://raw.githubusercontent.com/beatrizcepa26/SIG-2021/2296cc921ab8fd9b1a23bfb8b3fd5c84f6a0fa20/portuguese_charging_station/icons/carro-eletrico_2.svg")]
         
         for record in info:
         
